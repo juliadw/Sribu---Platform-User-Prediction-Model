@@ -1,5 +1,6 @@
 import streamlit as st
 import streamlit.components.v1 as stc
+import sklearn
 
 from eda_app import run_eda_app
 from ml_app import run_ml_app
@@ -19,7 +20,8 @@ desc_temp = """
 def main():
 
     stc.html(html_temp)
-    
+
+    st.write(f"Versi scikit-learn yang digunakan: {sklearn.__version__}")
     menu = ['Home', 'Exploratory Data Analysis','Machine Learning',]
     choice = st.sidebar.selectbox("Menu", menu)
 

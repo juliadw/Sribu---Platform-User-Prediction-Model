@@ -4,7 +4,7 @@ import numpy as np
 
 # import visualization package
 import matplotlib.pyplot as plt
-import matplotlib
+import matplotlib 
 matplotlib.use('Agg')
 import seaborn as sns
 import plotly.express as px
@@ -20,12 +20,13 @@ def run_eda_app():
     st.subheader("From Exploratory Data Analysis")
     df = load_data("human_capital.csv")
     df_survey = load_data("data_survey.csv")
+    df_results = load_data("df_results.csv")
     # st.dataframe(df)
 
-    submenu = st.sidebar.selectbox("SubMenu",["Description","Plots"])
+    submenu = st.sidebar.selectbox("SubMenu",["Description","Plots","Data Prediction"])
     if submenu == "Description":
 
-        with st.expander("Dataset Summary"):
+        with st.expander("Dataset"):
             st.dataframe(df_survey)
         
         with st.expander("Descriptive Summary"):
@@ -109,7 +110,30 @@ def run_eda_app():
             fig = plt.figure(figsize=(12, 8))
             sns.heatmap(corr_matrix, annot=True, cmap="coolwarm")
             st.pyplot(fig)
+    elif submenu == "Data Prediction":
+        st.text("Tabel data prediksi pengguna Sribu dengan probabilitas lebih dari 70%.")
+        show_high_probability_data()
+        # show_potential_customers()
     else:
         st.write("Gorila Coklat")
 
 
+def show_high_probability_data():
+    df = load_data("df_results.csv")
+    
+    # Allow user to select a threshold
+    threshold = st.slider("Select Probability Threshold", 0.0, 1.0, 0.8)
+    
+    # Filter based on the selected threshold
+    high_prob_data = df[df['Probability'] > threshold]
+    
+    # Show the filtered high-probability data
+    st.subheader("Data with High Prediction Probabilities")
+    st.dataframe(high_prob_data)
+
+    non_users_df = df[df['Platform freelancer1'] == 0]
+    potential_customers = non_users_df[non_users_df['Prediction'] == 1]
+    
+    # Display the filtered table
+    st.subheader("Potential Customers for Sribu")
+    st.dataframe(potential_customers)

@@ -2,147 +2,126 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import joblib
-from sklearn.decomposition import PCA
-from sklearn.preprocessing import StandardScaler
 
-import os
+# Load saved models, scalers, and encoders
+model = joblib.load('random_forest_model.pkl')
+scaler = joblib.load('scaler.pkl')
+pca = joblib.load('pca.pkl')
+encoder = joblib.load('encoder.pkl')  # Your label or one-hot encoder
 
-attribute_info = """
-                 - Department: Sales & Marketing, Operations, Technology, Analytics, R&D, Procurement, Finance, HR, Legal
-                 - Region: region 1 - region 34
-                 - Educaiton: Below Secondary, Bachelor's, Master's & above
-                 - Gender: Male and Female
-                 - Recruitment Channel: Referred, Sourcing, Others
-                 - No of Training: 1-10
-                 - Age: 10-60
-                 - Previous Year Rating: 1-5
-                 - Length of Service: 1-37 Month
-                 - Awards Won: 1. Yes, 0. No
-                 - Avg Training Score: 0-100
-                 """
+# Helper function to ensure alignment of one-hot encoded columns
+from sklearn.preprocessing import OneHotEncoder
 
-age = {'25-30':1, '31-35':2, '36-40':3, '41-45':4}
-gen = {'Laki-Laki':1, 'Perempuan':2}
-ses = {'Upper':1, 'Middle':2, 'Lower':3}
-bok = {'Ya':1, 'Tidak':2}
-job = {
-    'Bekerja penuh waktu (full-time), status kontrak':1,
-    'Bekerja penuh waktu (full-time), status permanen':2,
-    'Pemilik usaha/Wiraswasta':3, 
-    'Bekerja paruh waktu (part-time)':4,
-    'Tidak bekerja (ibu rumah tangga)':5,
-    'Pelajar SMA/SMK sederajat':6,
-    'Tidak bekerja (sedang mencari pekerjaan)':7, 
-    'Jenis pekerjaan yang dibayar lainnya':8,
-    'Pelajar SMP sederajat':9,
-    'Mahasiswa aktif':10,
-    'Mahasiswa cuti kuliah': 11
-}
-bisnisType = {'E-commerce':1, 'Berbasis layanan':2, 'Manufaktur':3, 'Kuliner':4, 'Fashion':5, 'Non-profit':6, 'Other':7}
-jasa = {'Manajemen media sosial':1, 'Pengembangan website':2, 'Desain logo':3, 'Penulisan konten':4, 'Layanan SEO':5, 'Other':6}
-platform = {'Other':1, 'Sribu':2}
+# Ensure that input_data contains only categorical columns for encoding
+def preprocess_input_data(input_data):
+    # Ensure you select only categorical columns that need encoding
+    categorical_columns = ['Gender', 'Domicile', 'Job Status', 
+                           'Jenis bisnis apa yang Anda operasikan?', 
+                           'Jasa freelancer apa yang paling sering Anda gunakan?', 
+                           'Seberapa sering Anda menggunakan layanan freelancer (penyedia jasa) untuk proyek Anda?']
+    # One-hot encode categorical columns
+    input_data_encoded = encoder.transform(input_data[categorical_columns])
+    
+    # Convert the encoded result (usually sparse matrix) into a DataFrame
+    encoded_df = pd.DataFrame(input_data_encoded.toarray(), columns=encoder.get_feature_names_out(categorical_columns))
 
+    # Concatenate the encoded DataFrame with the remaining columns (numeric features)
+    input_data_processed = pd.concat([input_data.drop(columns=categorical_columns), encoded_df], axis=1)
 
-def get_value(val, my_dict):
-    for key, value in my_dict.items():
-        if val == key:
-            return value
+    # Ensure the input_data matches the expected format and order
+    expected_columns = ['nominal__Gender_Perempuan', 'nominal__Domicile_Banten', 
+                        'nominal__Domicile_Bengkulu', 'nominal__Domicile_DI Yogyakarta', 
+                        'nominal__Domicile_DKI Jakarta', 'nominal__Domicile_Jawa Barat', 
+                        'nominal__Domicile_Jawa Tengah', 'nominal__Domicile_Jawa Timur', 
+                        'nominal__Domicile_Kalimantan Selatan', 'nominal__Domicile_Kalimantan Timur', 
+                        'nominal__Domicile_Kepulauan Riau', 'nominal__Domicile_Lampung', 
+                        'nominal__Domicile_Maluku', 'nominal__Domicile_Nanggroe Aceh Darussalam', 
+                        'nominal__Domicile_Nusa Tenggara Barat', 'nominal__Domicile_Nusa Tenggara Timur', 
+                        'nominal__Domicile_Riau', 'nominal__Domicile_Sulawesi Selatan', 
+                        'nominal__Domicile_Sulawesi Tengah', 'nominal__Domicile_Sulawesi Utara', 
+                        'nominal__Domicile_Sumatera Barat', 'nominal__Domicile_Sumatera Selatan', 
+                        'nominal__Domicile_Sumatera Utara', 'nominal__Job Status_Bekerja penuh waktu', 
+                        'nominal__Job Status_Jenis pekerjaan yang dibayar lainnya', 
+                        'nominal__Job Status_Mahasiswa/pelajar', 'nominal__Job Status_Pemilik usaha/Wiraswasta', 
+                        'nominal__Job Status_Tenaga lepas (freelancer)', 'nominal__Job Status_Tidak bekerja', 
+                        'nominal__Jenis bisnis apa yang Anda operasikan?_E-commerce', 'nominal__Jenis bisnis apa yang Anda operasikan?_Fashion', 
+                        'nominal__Jenis bisnis apa yang Anda operasikan?_Kuliner', 'nominal__Jenis bisnis apa yang Anda operasikan?_Manufaktur', 
+                        'nominal__Jenis bisnis apa yang Anda operasikan?_Non-profit', 'nominal__Jenis bisnis apa yang Anda operasikan?_Other', 
+                        'nominal__Jasa freelancer apa yang paling sering Anda gunakan?_Layanan SEO', 'nominal__Jasa freelancer apa yang paling sering Anda gunakan?_Manajemen media sosial', 
+                        'nominal__Jasa freelancer apa yang paling sering Anda gunakan?_NA', 'nominal__Jasa freelancer apa yang paling sering Anda gunakan?_Other', 
+                        'nominal__Jasa freelancer apa yang paling sering Anda gunakan?_Pengembangan website', 'nominal__Jasa freelancer apa yang paling sering Anda gunakan?_Penulisan konten', 
+                        'nominal__Business Owned Key_Ya', 'nominal__Seberapa sering Anda menggunakan layanan freelancer (penyedia jasa) untuk proyek Anda?_Harian', 
+                        'nominal__Seberapa sering Anda menggunakan layanan freelancer (penyedia jasa) untuk proyek Anda?_Mingguan', 'nominal__Seberapa sering Anda menggunakan layanan freelancer (penyedia jasa) untuk proyek Anda?_NA', 
+                        'nominal__Seberapa sering Anda menggunakan layanan freelancer (penyedia jasa) untuk proyek Anda?_Tahunan', 
+                        'nominal__Seberapa sering Anda menggunakan layanan freelancer (penyedia jasa) untuk proyek Anda?_Tidak menentu', 
+                        'nominal__Seberapa sering Anda menggunakan layanan freelancer (penyedia jasa) untuk proyek Anda?_Triwulanan', 'remainder__Age Range', 
+                        'remainder__SES Grade', 'remainder__Berapa pendapatan tahunan bisnis Anda?', 
+                        'remainder__Berapa anggaran pemasaran bulanan Anda?', 'remainder__Berapa jumlah karyawan yang Anda miliki?', 
+                        'remainder__Platform freelancer1']  # Update expected columns
 
-def load_model(model_file):
-    loaded_model = joblib.load(open(os.path.join(model_file), 'rb'))
-    return loaded_model
+    # Add missing columns as zeros if they are not in the input data
+    missing_cols = set(expected_columns) - set(input_data_processed.columns)
+    for col in missing_cols:
+        input_data_processed[col] = 0
 
+    # Reorder the columns to match the expected order
+    input_data_processed = input_data_processed[expected_columns]
+
+    return input_data_processed
+
+# Function to run the app and make predictions
 def run_ml_app():
-    st.subheader("ML Section")
-    with st.expander("Attribute Info"):
-        st.markdown(attribute_info)
+    st.title("Freelancer Platform Prediction")
 
-    st.subheader("Input Your Data")
-    range_age = st.selectbox('Range Age', ['25-30', '31-35', '36-40', '41-45'])
     gender = st.radio('Gender', ['Laki-Laki', 'Perempuan'])
-    ses_grade = st.selectbox('SES Grade', ['Upper', 'Middle', 'Lower'])
-    job_status = st.selectbox("Job Status", ['Bekerja penuh waktu (full-time), status kontrak', 
+    domicile = st.selectbox('Domicile', ['Sumatera Selatan','Sumatera Utara','Riau','Banten','DKI Jakarta','Jawa Barat', 'Jawa Tengah','DI Yogyakarta','Jawa Timur','Bali','Sulawesi Selatan','Kalimantan Selatan','Sumatera Barat','Sulawesi Tengah'])
+    job_status = st.selectbox('Job Status', ['Bekerja penuh waktu (full-time), status kontrak', 
                                              'Bekerja penuh waktu (full-time), status permanen', 
                                              'Pemilik usaha/Wiraswasta', 'Bekerja paruh waktu (part-time)', 
                                              'Tidak bekerja (ibu rumah tangga)', 'Pelajar SMA/SMK sederajat', 
                                              'Tidak bekerja (sedang mencari pekerjaan)', 
                                              'Jenis pekerjaan yang dibayar lainnya', 'Pelajar SMP sederajat', 
                                              'Mahasiswa aktif', 'Mahasiswa cuti kuliah'])
-    b_owned_key = st.selectbox('Business Owned Key', ['Ya', 'Tidak'])
-    jenis_bisnis = st.selectbox('Jenis bisnis apa yang Anda operasikan?', ['E-commerce', 'Berbasis layanan', 
-                                                                           'Manufaktur', 'Kuliner', 'Fashion', 
-                                                                           'Non-profit', 'Other'])
-    jasa_freelance = st.selectbox('Jasa freelancer apa yang paling sering Anda gunakan?', 
-                                   ['Manajemen media sosial', 'Pengembangan website', 'Desain logo', 
+    business_type = st.selectbox('Business Type', ['E-commerce', 'Berbasis layanan', 'Manufaktur', 'Kuliner', 'Fashion', 'Non-profit', 'Other'])
+    freelancer_service = st.selectbox('Freelancer Service Used', ['Manajemen media sosial', 'Pengembangan website', 'Desain logo', 
                                     'Penulisan konten', 'Layanan SEO', 'Other'])
-    platform_freelace = st.selectbox('Platform freelancer (penyedia jasa) mana yang paling sering Anda gunakan?', 
-                                      ['Other', 'Sribu'])
+    platform_experience = st.selectbox('Experience with Freelancer Platform', ['Tahunan', 'Bulanan', 'Mingguan', 'Harian', 'Triwulanan', 'Tidak menentu'])
 
-    # Encode Input
-    result = {
-        'Age Range': range_age,
-        'Gender': gender,
-        'SES Grade': ses_grade,
-        'Job Status': job_status,
-        'Business Owned Key': b_owned_key,
-        'Jenis bisnis apa yang Anda operasikan?': jenis_bisnis,
-        'Jasa freelancer apa yang paling sering Anda gunakan?': jasa_freelance,
-        'Platform freelancer1': platform_freelace,
-    }
+    # Input for ordinal features
+    age_range = st.selectbox('Age Range', ['25-30', '31-35', '36-40', '41-45'])
+    annual_income = st.selectbox('Annual Income of Business', ['Kurang dari Rp750 juta', 'Rp750 juta - Rp1.5 miliar', 'Rp1.5 miliar - Rp7.5 miliar', 'Lebih dari Rp15 miliar', 'Rp7.5 miliar - Rp15 miliar'])
+    marketing_budget = st.selectbox('Monthly Marketing Budget', ['Kurang dari Rp7.500.000', 'Rp7.500.000 - Rp15.000.000', 'Rp15.000.000 - Rp75.000.000', 'Rp75.000.000 - Rp150.000.000', 'Lebih dari Rp150.000.000'])
+    employee_count = st.selectbox('Number of Employees', ['Kurang dari 5', '6-10','11-20','21-50','51-100','Lebih dari 100'])
 
-    # Encode Values Directly
-    encoded_result = [
-        get_value(result['Age Range'], age),
-        get_value(result['Gender'], gen),
-        get_value(result['SES Grade'], ses),
-        get_value(result['Job Status'], job),
-        get_value(result['Business Owned Key'], bok),
-        get_value(result['Jenis bisnis apa yang Anda operasikan?'], bisnisType),
-        get_value(result['Jasa freelancer apa yang paling sering Anda gunakan?'], jasa),
-        get_value(result['Platform freelancer1'], platform),
-    ]
-    expected_columns = ['Age Range', 'Gender', 'SES Grade', 'Job Status', 'Business Owned Key', 
-                    'Jenis bisnis apa yang Anda operasikan?', 'Jasa freelancer apa yang paling sering Anda gunakan?', 
-                    'Platform freelancer1']
+    # Prepare input data in DataFrame
+    input_data = pd.DataFrame({
+        'Gender': [gender],
+        'Domicile': [domicile],
+        'Job Status': [job_status],
+        'Jenis bisnis apa yang Anda operasikan?': [business_type],
+        'Jasa freelancer apa yang paling sering Anda gunakan?': [freelancer_service],
+        'Seberapa sering Anda menggunakan layanan freelancer (penyedia jasa) untuk proyek Anda?': [platform_experience],
+        'Age Range': [age_range],
+        'Berapa pendapatan tahunan bisnis Anda?': [annual_income],
+        'Berapa anggaran pemasaran bulanan Anda?': [marketing_budget],
+        'Berapa jumlah karyawan yang Anda miliki?': [employee_count]
+    })
+    if st.button('Predict'):
+        # Preprocess the input data
+        input_data_processed = preprocess_input_data(input_data)
 
-    # prediction section
-    st.subheader('Prediction Result')
-    # Load the scaler and model
-    model = load_model("model_tuned.pkl")
-    scaler = load_model("scaler.pkl")
+        # Scale the data
+        input_data_scaled = scaler.transform(input_data_processed)
 
-    X_test = pd.DataFrame([encoded_result], columns=expected_columns)
+        # Apply PCA
+        input_data_pca = pca.transform(input_data_scaled)
 
-    # Scale Data
-    X_test_scaled = pd.DataFrame(scaler.transform(X_test), columns=X_test.columns)
+        # Predict using the trained model
+        prediction = model.predict(input_data_pca)
 
+        # Show prediction result
+        if prediction[0] == 1:
+            st.write("Customer is likely to use Sribu.")
+        else:
+            st.write("Customer is not likely to use Sribu.")
 
-
-
-    # Perform PCA on the scaled data
-    pca = load_model("pca.pkl")
-    X_test_pca = pca.transform(X_test_scaled)
-
-    # Melakukan prediksi
-    prediction = model.predict(X_test_pca)
-    prediction_prob = model.predict_proba(X_test_pca)[:,1]
-
-    # Menampilkan hasil prediksi
-    if prediction == 0:
-        st.write("Hasil Prediksi: Kelas 0 (tidak berpotensi) - Tidak ada risiko.")
-    else:
-        st.write("Hasil Prediksi: Kelas 1 (berpotensi) - Ada risiko.")
-    
-    # Menampilkan probabilitas prediksi untuk Kelas 0 dan Kelas 1
-    st.write(f"Probabilitas Kelas 0: {prediction_prob[0][0]:.4f}")
-    st.write(f"Probabilitas Kelas 1: {prediction_prob[0][1]:.4f}")
-
-    # Menampilkan hasil prediksi dengan visualisasi (optional)
-    st.subheader("Visualisasi Prediksi")
-    if prediction == 0:
-        st.markdown("<h3 style='color:green;'>Model Menyatakan Tidak Ada Risiko</h3>", unsafe_allow_html=True)
-    else:
-        st.markdown("<h3 style='color:red;'>Model Menyatakan Ada Risiko</h3>", unsafe_allow_html=True)
-
-import sklearn
-print(sklearn.__version__)
