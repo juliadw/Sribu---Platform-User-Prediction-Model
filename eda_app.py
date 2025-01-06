@@ -132,7 +132,7 @@ def show_high_probability_data():
     st.dataframe(high_prob_data)
 
     non_users_df = df[df['Platform freelancer1'] == 0]
-    potential_customers = non_users_df[non_users_df['Prediction'] == 1]
+    potential_customers = non_users_df[non_users_df['Probability'] > threshold]
     
     # Display the filtered table
     st.subheader("Potential Customers for Sribu")
